@@ -2,23 +2,32 @@ package main
 
 import (
 	"flag"
-	"log"
+	"log/slog"
 	"net/http"
+	"os"
 )
 
+type application struct {
+	logger *slog.Logger
+}
+
 func main() {
-	addr := flag.String("addr", ":4000", "HTTP Port to Listen On Default is :4000")
+	//Parsing command line switches
+	addr := flag.String("addr", ":4000", "HTTP Port to Listen On")
 	flag.Parse()
-	mux := http.NewServeMux()
-	fileServer := http.FileServer(http.Dir("./ui/static/"))
-	mux.Handle("/static/", http.StripPrefix("/static", fileServer))
-	mux.HandleFunc("GET /{$}", home)
-	mux.HandleFunc("GET /snippet/view/{id}", snippetView)
-	mux.HandleFunc("GET /snippet/create", snippetCreate)
-	mux.HandleFunc("POST /snippet/create", snippetCreatePost)
 
-	log.Printf("starting server on %s", *addr)
+	//Creating a new structured logger to use throughout, just prints to the standard output
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
-	err := http.ListenAndServe(*addr, mux)
-	log.Fatal(err)
+	//Creating a new application struct to pass for now just the structured logger around as a dependency injection
+	app := &application{
+		logger: logger,
+	}
+
+	logger.Info("starting server", "addr", *addr)
+
+	//Launching server and calling routes.go to create the routes or error out and fail
+	err := http.ListenAndServe(*addr, app.routes())
+	logger.Error(err.Error())
+	os.Exit(1)
 }
